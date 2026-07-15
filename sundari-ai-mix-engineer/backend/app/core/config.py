@@ -2,10 +2,7 @@
 config.py
 =========
 Centralized application settings, loaded from environment variables (with
-sensible local-dev defaults) using pydantic-settings. Keeping this in one
-place now (Phase 1) means later phases (auth, cloud sync, subscriptions)
-just add fields here rather than scattering `os.environ` calls through
-the codebase.
+sensible local-dev defaults) using pydantic-settings.
 """
 
 from __future__ import annotations
@@ -31,30 +28,22 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "500"))
     allowed_audio_extensions: tuple = (".wav", ".mp3", ".aiff", ".aif", ".flac")
 
-    allowed_origins: list = Field(default_factory=list)
+    allowed_origins_raw: str = os.getenv("ALLOWED_ORIGINS", "")
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def _split_allowed_origins(cls, v):
-        if isinstance(v, str):
-            return [item.strip() for item in v.split(",") if item.strip()]
-        return v
+    @property
+    def allowed_origins(self) -> list:
+        return [o.strip() for o in self.allowed_origins_raw.split(",") if o.strip()]
 
     upload_dir: str = os.getenv("UPLOAD_DIR", "./data/uploads")
     temp_dir: str = os.getenv("TEMP_DIR", "./data/temp")
 
-    decision_provider_order: list = Field(
-        default_factory=lambda: os.getenv(
-            "DECISION_PROVIDER_ORDER", "claude,openai,gemini,local_llm",
-        ).split(",")
+    decision_provider_order_raw: str = os.getenv(
+        "DECISION_PROVIDER_ORDER", "claude,openai,gemini,local_llm"
     )
 
-    @field_validator("decision_provider_order", mode="before")
-    @classmethod
-    def _split_provider_order(cls, v):
-        if isinstance(v, str):
-            return [item.strip() for item in v.split(",") if item.strip()]
-        return v
+    @property
+    def decision_provider_order(self) -> list:
+        return [item.strip() for item in self.decision_provider_order_raw.split(",") if item.strip()]
 
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
