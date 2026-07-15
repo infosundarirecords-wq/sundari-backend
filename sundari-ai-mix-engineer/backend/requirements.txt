@@ -1,0 +1,40 @@
+# Sundari AI Mix Engineer — Backend Requirements
+# Phase 1: Audio Analysis Engine + FastAPI service
+
+# --- Web framework ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9        # required by FastAPI for file uploads
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# --- Audio DSP / analysis ---
+numpy==2.1.1
+scipy==1.14.1
+librosa==0.10.2.post1          # audio loading (wav/mp3/aiff/flac) + DSP utils
+soundfile==0.12.1              # libsndfile backend used by librosa for wav/aiff/flac
+audioread==3.0.1               # ffmpeg-backed fallback decoder used by librosa for mp3
+pyloudnorm==0.1.1              # cross-check reference for LUFS (engine's own BS.1770
+                                # implementation in metrics.py is the primary measurement)
+
+# --- Database ---
+sqlalchemy==2.0.35
+# Development: SQLite (bundled with Python, no extra driver needed)
+psycopg2-binary==2.9.9         # Production: PostgreSQL driver
+
+# --- Testing ---
+pytest==8.3.3
+httpx==0.27.2                  # used by FastAPI's TestClient + Local LLM (Ollama) provider
+
+# --- Phase 4: Multi-Provider Decision Engine (AI SDKs) ---
+anthropic==0.39.0              # Claude
+openai==1.54.0                 # OpenAI (GPT-5 etc.)
+google-generativeai==0.8.3     # Gemini
+# Local LLM (Ollama): koi extra SDK nahi chahiye, httpx se REST API call hoti hai.
+# Ollama khud alag se install/run karna hota hai: https://ollama.com
+
+# --- System dependency (not a pip package) ---
+# ffmpeg must be installed and available on PATH for MP3 decoding:
+#   Ubuntu/Debian: sudo apt install ffmpeg
+#   macOS (Homebrew): brew install ffmpeg
+#   Windows: https://ffmpeg.org/download.html
