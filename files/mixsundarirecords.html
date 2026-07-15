@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mix Sundari Records — AI Mixing Studio</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg: #0b0b0c;
+    --bg-panel: #141416;
+    --bg-panel-raised: #1b1b1e;
+    --line: #2a2a2d;
+    --red: #d61f1f;
+    --red-dim: #7a1414;
+    --white: #f2f0ec;
+    --grey: #8a8a8f;
+    --grey-dim: #55555a;
+    --green: #3fae5c;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  body{
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Archivo', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* --- Header --- */
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 28px 48px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand{ display:flex; align-items:center; gap:14px; }
+  .brand-mark{
+    width:34px; height:34px;
+    background: var(--red);
+    clip-path: polygon(50% 0%, 68% 30%, 100% 40%, 78% 50%, 100% 60%, 68% 70%, 50% 100%, 32% 70%, 0% 60%, 22% 50%, 0% 40%, 32% 30%);
+  }
+  .brand-text{ font-family:'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 2px; }
+  .brand-text small{ display:block; font-family:'Archivo'; font-size:10px; letter-spacing:4px; color:var(--grey); font-weight:600; margin-top:-4px;}
+  header nav{ font-family:'JetBrains Mono', monospace; font-size: 12px; color: var(--grey); letter-spacing: 1px; }
+
+  /* --- Hero --- */
+  .hero{
+    padding: 64px 48px 40px;
+    border-bottom: 1px solid var(--line);
+  }
+  .hero-eyebrow{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color: var(--red);
+    letter-spacing: 3px; text-transform: uppercase; margin-bottom: 18px;
+  }
+  .hero h1{
+    font-family:'Bebas Neue', sans-serif;
+    font-size: clamp(40px, 7vw, 84px);
+    line-height: 0.92;
+    letter-spacing: 1px;
+    max-width: 900px;
+  }
+  .hero h1 em{ font-style:normal; color: var(--red); }
+  .hero p{
+    color: var(--grey); max-width: 560px; margin-top: 20px; font-size: 15px; line-height:1.6;
+  }
+
+  /* --- Layout --- */
+  .studio{
+    display:grid;
+    grid-template-columns: 1fr 380px;
+    gap: 1px;
+    background: var(--line);
+  }
+  @media (max-width: 900px){ .studio{ grid-template-columns: 1fr; } }
+
+  .panel{ background: var(--bg-panel); padding: 40px 48px; }
+
+  .section-label{
+    font-family:'JetBrains Mono', monospace; font-size: 11px; color: var(--grey);
+    letter-spacing: 3px; text-transform: uppercase; margin-bottom: 20px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .section-label::after{ content:''; flex:1; height:1px; background: var(--line); }
+
+  /* --- Track rows --- */
+  .track{
+    display:grid;
+    grid-template-columns: 28px 1fr 140px 90px;
+    align-items:center;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .track-num{ font-family:'JetBrains Mono', monospace; color: var(--grey-dim); font-size:13px; }
+  .track-name-wrap input{
+    background:none; border:none; color: var(--white); font-size:15px; font-weight:600;
+    width:100%; font-family:'Archivo'; padding: 4px 0;
+  }
+  .track-name-wrap input:focus{ outline:none; border-bottom:1px solid var(--red); }
+  .track-file{ font-family:'JetBrains Mono', monospace; font-size:11px; color: var(--grey); margin-top:2px; }
+  select.role{
+    background: var(--bg-panel-raised); border:1px solid var(--line); color: var(--white);
+    padding: 8px 10px; font-family:'JetBrains Mono', monospace; font-size:12px; border-radius:4px;
+  }
+  .track-upload-btn, .track-remove{
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:1px;
+    padding: 8px 10px; border-radius:4px; text-align:center; cursor:pointer; border:1px solid var(--line);
+    background: transparent; color: var(--grey);
+  }
+  .track-upload-btn:hover{ border-color: var(--red); color: var(--white); }
+  .track-remove{ color: var(--red-dim); }
+  .track-remove:hover{ color: var(--red); border-color: var(--red); }
+  .track input[type=file]{ display:none; }
+
+  .add-track{
+    margin-top: 18px;
+    display:flex; align-items:center; gap:10px;
+    background:none; border: 1px dashed var(--line); color: var(--grey);
+    padding: 14px 18px; width:100%; border-radius:6px; cursor:pointer;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:1px;
+    transition: all .15s;
+  }
+  .add-track:hover{ border-color: var(--red); color: var(--white); background: rgba(214,31,31,0.05); }
+  .add-track span{ font-size:16px; color: var(--red); }
+
+  /* --- Reference block --- */
+  .ref-box{
+    margin-top: 34px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 22px;
+    background: var(--bg-panel-raised);
+  }
+  .ref-box h3{
+    font-family:'Bebas Neue'; font-size:20px; letter-spacing:1px; margin-bottom:6px;
+  }
+  .ref-box p{ font-size:13px; color: var(--grey); margin-bottom: 16px; line-height:1.5; }
+  .ref-upload{
+    display:flex; align-items:center; justify-content:space-between;
+    border: 1px solid var(--line); border-radius:6px; padding: 12px 16px;
+    cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:12px;
+  }
+  .ref-upload:hover{ border-color: var(--red); }
+  .ref-filename{ color: var(--green); }
+
+  .instruction-box{ margin-top: 22px; }
+  .instruction-box label{
+    display:block; font-family:'JetBrains Mono', monospace; font-size:11px; color: var(--grey);
+    letter-spacing:1px; margin-bottom:10px;
+  }
+  textarea{
+    width:100%; background: var(--bg-panel-raised); border:1px solid var(--line); color: var(--white);
+    border-radius:6px; padding: 14px; font-family:'Archivo'; font-size:14px; min-height:80px; resize:vertical;
+  }
+  textarea:focus{ outline:none; border-color: var(--red); }
+
+  /* --- Right panel: AI teacher / actions --- */
+  .action-btn{
+    width:100%; padding: 18px; border-radius: 6px; border:none; cursor:pointer;
+    font-family:'Bebas Neue'; font-size: 20px; letter-spacing:2px;
+    background: var(--red); color: var(--white);
+    transition: all .15s;
+  }
+  .action-btn:hover{ background:#ef2828; }
+  .action-btn:disabled{ background: var(--grey-dim); cursor:not-allowed; color:#999; }
+  .action-btn.secondary{
+    background:none; border:1px solid var(--line); color: var(--white); margin-top:12px;
+  }
+  .action-btn.secondary:hover{ border-color: var(--green); color: var(--green); }
+  .action-btn.secondary:disabled{ border-color: var(--line); color: var(--grey-dim); }
+
+  .status-line{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color: var(--grey);
+    margin-top:14px; line-height:1.6; min-height: 40px;
+  }
+
+  .teacher-panel{
+    margin-top: 30px; border: 1px solid var(--line); border-radius:8px;
+    background: var(--bg-panel-raised); padding: 20px;
+    max-height: 420px; overflow-y:auto;
+  }
+  .teacher-panel h4{
+    font-family:'JetBrains Mono', monospace; font-size:11px; color: var(--red);
+    letter-spacing:2px; margin-bottom:14px;
+  }
+  .teacher-entry{
+    font-size: 13px; line-height:1.6; color: #cfcfcf; margin-bottom: 14px;
+    padding-bottom:14px; border-bottom: 1px solid var(--line);
+  }
+  .teacher-entry:last-child{ border:none; margin:0; padding:0; }
+  .teacher-entry .t-track{ color: var(--white); font-weight:700; }
+  .teacher-entry .t-conf{ color: var(--green); font-family:'JetBrains Mono', monospace; font-size:11px; }
+
+  .empty-state{
+    font-size: 13px; color: var(--grey-dim); text-align:center; padding: 30px 10px;
+    font-family:'JetBrains Mono', monospace; line-height:1.7;
+  }
+
+  footer{
+    text-align:center; padding: 30px; color: var(--grey-dim); font-family:'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing:1px; border-top:1px solid var(--line);
+  }
+
+  /* --- Studio locked state (before login) --- */
+  .studio-wrap{ position:relative; }
+  .studio-locked{ filter: blur(6px); pointer-events:none; user-select:none; }
+
+  /* --- Header user chip --- */
+  .header-right{ display:flex; align-items:center; gap:18px; }
+  .user-chip{
+    display:none; align-items:center; gap:10px;
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--grey);
+    border:1px solid var(--line); border-radius: 30px; padding:6px 14px 6px 6px;
+  }
+  .user-chip.show{ display:flex; }
+  .user-avatar{
+    width:26px; height:26px; border-radius:50%; object-fit:cover;
+    background: var(--red); display:flex; align-items:center; justify-content:center;
+    font-family:'Bebas Neue'; font-size:13px; color:var(--white); flex-shrink:0;
+  }
+  .user-chip .u-tag{ color:var(--green); font-size:10px; letter-spacing:1px; margin-left:4px; }
+  .logout-link{ cursor:pointer; color: var(--red-dim); }
+  .logout-link:hover{ color: var(--red); }
+
+  /* --- Login / Payment overlay --- */
+  .auth-overlay{
+    position:fixed; inset:0; background: rgba(11,11,12,0.92); backdrop-filter: blur(4px);
+    display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;
+  }
+  .auth-overlay.hidden{ display:none; }
+  .auth-card{
+    width:100%; max-width: 420px; background: var(--bg-panel-raised);
+    border:1px solid var(--line); border-radius:12px; padding: 36px 32px;
+  }
+  .auth-card h2{ font-family:'Bebas Neue'; font-size:28px; letter-spacing:1px; margin-bottom:6px; }
+  .auth-card .auth-sub{ font-size:13px; color:var(--grey); margin-bottom:26px; line-height:1.5; }
+  .gsi-btn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
+    background:#fff; color:#1f1f1f; border:none; border-radius:6px; padding:13px;
+    font-family:'Archivo'; font-weight:600; font-size:14px; cursor:pointer;
+  }
+  .gsi-btn:hover{ opacity:.92; }
+  .gsi-btn img{ width:18px; height:18px; }
+  .auth-divider{
+    display:flex; align-items:center; gap:12px; margin: 22px 0;
+    font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--grey-dim);
+  }
+  .auth-divider::before, .auth-divider::after{ content:''; flex:1; height:1px; background:var(--line); }
+  .auth-field{ margin-bottom:14px; }
+  .auth-field label{
+    display:block; font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--grey);
+    letter-spacing:1px; margin-bottom:8px;
+  }
+  .auth-field input{
+    width:100%; background: var(--bg-panel); border:1px solid var(--line); color: var(--white);
+    border-radius:6px; padding: 12px 14px; font-family:'Archivo'; font-size:14px;
+  }
+  .auth-field input:focus{ outline:none; border-color: var(--red); }
+  .auth-toggle-link{
+    text-align:center; margin-top:18px; font-family:'JetBrains Mono', monospace; font-size:11px;
+    color: var(--grey-dim); cursor:pointer;
+  }
+  .auth-toggle-link:hover{ color: var(--grey); }
+  .auth-error{
+    color:var(--red); font-family:'JetBrains Mono', monospace; font-size:12px;
+    margin-top:12px; min-height:16px;
+  }
+  .paywall-price{
+    font-family:'Bebas Neue'; font-size:52px; color:var(--white); line-height:1; margin: 4px 0 2px;
+  }
+  .paywall-price span{ font-family:'JetBrains Mono'; font-size:14px; color:var(--grey); }
+  .paywall-note{ font-size:12px; color:var(--grey); margin-bottom:22px; line-height:1.5; }
+  .paywall-note b{ color:var(--green); }
+
+  /* --- Engineer / About strip --- */
+  .engineer-strip{
+    display:flex; align-items:center; gap:22px;
+    padding: 40px 48px; border-top:1px solid var(--line);
+    max-width: 720px; margin: 0 auto;
+  }
+  .engineer-photo{
+    width:76px; height:76px; border-radius:50%; object-fit:cover;
+    border: 2px solid var(--red); flex-shrink:0;
+  }
+  .engineer-strip h4{ font-family:'Bebas Neue'; font-size:20px; letter-spacing:1px; margin-bottom:4px; }
+  .engineer-strip p{ font-size:13px; color:var(--grey); line-height:1.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <!-- Original Sundari Records logo -->
+    <img src="sundari_logo.png" alt="Sundari Records" class="brand-mark" style="object-fit:contain; background:none;">
+    <div class="brand-text">SUNDARI<small>RECORDS · AI MIXING</small></div>
+  </div>
+  <div class="header-right">
+    <div class="user-chip" id="user-chip">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <span id="user-chip-name">—</span>
+      <span class="u-tag" id="user-chip-tag"></span>
+      <span class="logout-link" id="logout-link">LOGOUT</span>
+    </div>
+    <nav id="backend-status">BACKEND: CHECKING...</nav>
+  </div>
+</header>
+
+<!-- ============ STEP 1: LOGIN ============ -->
+<div class="auth-overlay" id="auth-overlay">
+  <div class="auth-card">
+    <h2>Sign in to Sundari Records</h2>
+    <div class="auth-sub" id="auth-sub">Mix karne ke liye pehle sign in karein.</div>
+
+    <div id="login-view">
+      <div id="g_id_signin_wrap">
+        <!-- Real Google Sign-In yahan render hoga (see script section for Client ID setup) -->
+        <button class="gsi-btn" id="fallback-google-btn">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">
+          Continue with Google
+        </button>
+      </div>
+      <div class="auth-divider">OR</div>
+      <div class="auth-toggle-link" id="show-admin-login">Admin login →</div>
+      <div class="auth-error" id="login-error"></div>
+    </div>
+
+    <div id="admin-view" style="display:none;">
+      <div class="auth-field">
+        <label>ADMIN EMAIL</label>
+        <input type="email" id="admin-email" placeholder="admin@mixsundarirecords.com">
+      </div>
+      <div class="auth-field">
+        <label>PASSWORD</label>
+        <input type="password" id="admin-password" placeholder="••••••••">
+      </div>
+      <button class="action-btn" id="admin-login-btn" style="width:100%;">Admin Login</button>
+      <div class="auth-toggle-link" id="show-google-login">← Back to Google sign in</div>
+      <div class="auth-error" id="admin-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ STEP 2: MOBILE NUMBER (post Google sign-in) ============ -->
+<div class="auth-overlay hidden" id="mobile-overlay">
+  <div class="auth-card">
+    <h2>Ek aakhri cheez</h2>
+    <div class="auth-sub">Aapka mobile number — booking aur mix-ready alerts ke liye.</div>
+    <div class="auth-field">
+      <label>MOBILE NUMBER</label>
+      <input type="tel" id="mobile-input" placeholder="+91 98765 43210">
+    </div>
+    <button class="action-btn" id="mobile-continue-btn" style="width:100%;">Continue</button>
+    <div class="auth-error" id="mobile-error"></div>
+  </div>
+</div>
+
+<!-- ============ STEP 3: PAYMENT / TRIAL GATE ============ -->
+<div class="auth-overlay hidden" id="paywall-overlay">
+  <div class="auth-card">
+    <h2>Ek trial mix</h2>
+    <div class="paywall-price">₹999 <span>/ one-time trial mix</span></div>
+    <div class="paywall-note">Isse aapko ek poora AI-mixed track milega. Pasand aaye to future mixes ke liye plans available honge. <b>Trial sirf ek baar use ho sakta hai.</b></div>
+    <button class="action-btn" id="pay-btn" style="width:100%;">Pay ₹999 &amp; Start Trial</button>
+    <div class="auth-error" id="pay-error"></div>
+  </div>
+</div>
+<!-- Real payment ke liye Razorpay/PayU jaisa gateway account banana hoga —
+     iske "Key ID" ko neeche script section mein RAZORPAY_KEY_ID variable mein daalna hai -->
+
+
+<section class="hero">
+  <div class="hero-eyebrow">Track by track, guided by your reference</div>
+  <h1>Upload the parts.<br>Point at the sound.<br><em>Let it mix.</em></h1>
+  <p>Har instrument aur vocal alag WAV se upload karein, ek reference gaana daalein jaisa sound chahiye, aur AI usi direction mein poora mix taiyaar karega — final master tak.</p>
+</section>
+
+<div class="studio-wrap" id="studio-wrap">
+<div class="studio studio-locked" id="studio">
+  <div class="panel">
+    <div class="section-label">Tracks</div>
+    <div id="track-list"></div>
+    <button class="add-track" id="add-track-btn"><span>+</span> Naya track add karein</button>
+
+    <div class="ref-box">
+      <h3>Reference Track</h3>
+      <p>Koi bhi gaana upload karein jiska sound/vibe aapko chahiye — AI isko sunkar target tone, warmth aur balance samjhega.</p>
+      <label class="ref-upload" id="ref-upload-label">
+        <span id="ref-upload-text">Reference audio file chunein</span>
+        <span style="color:var(--red)">↑</span>
+      </label>
+      <input type="file" id="ref-input" accept="audio/*" style="display:none">
+    </div>
+
+    <div class="instruction-box">
+      <label>ATIRIKT INSTRUCTION (optional)</label>
+      <textarea id="instruction" placeholder="jaise: vocal upfront rahe, bass thoda warm aur gehra ho, overall vintage feel chahiye..."></textarea>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-label">AI Engine</div>
+    <button class="action-btn" id="analyze-btn" disabled>Analyze &amp; Mix</button>
+    <button class="action-btn secondary" id="master-btn" disabled>Master &amp; Download</button>
+    <div class="status-line" id="status-line">Kam se kam 1 track upload karein shuru karne ke liye.</div>
+
+    <div class="teacher-panel">
+      <h4>AI TEACHER PANEL</h4>
+      <div id="teacher-content">
+        <div class="empty-state">Jab aap "Analyze &amp; Mix" dabayenge,<br>AI ka poora reasoning yahan dikhega —<br>samasya kya thi, kya badla, kyun badla.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="engineer-strip">
+  <img src="artist_photo.jpg" alt="Sundari Records" class="engineer-photo">
+  <div>
+    <h4>Sundari Records</h4>
+    <p>Har mix ek engineer ki tarah samjha jaata hai — AI sirf tool hai, decision genuine reasoning se aata hai.</p>
+  </div>
+</div>
+
+<footer>MIXSUNDARIRECORDS.COM — POWERED BY SUNDARI AI MIX ENGINE</footer>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+// ============================================================
+// CONFIG — asli backend deploy hone ke baad ye values badalni hain
+// ============================================================
+// Local testing ke liye 127.0.0.1 theek hai, LEKIN live website (jo
+// duniya mein kahin se bhi khulti hai) ke liye yahan apne cloud server
+// ka public URL daalein — jaise "https://api.mixsundarirecords.com"
+const BACKEND_URL = "http://127.0.0.1:8000"; // abhi local hai — public banane ke liye cloud par deploy karna hoga
+
+// Google Cloud Console → APIs & Services → Credentials → OAuth Client ID (Web)
+// se milega. Authorized origin mein apni live website ka URL add karna
+// (jaise https://mixsundarirecords.com). Free hai, 5 min ka kaam.
+const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+
+// Aapki admin email — isi se login karne par payment/trial skip hoga.
+// Google se isi email se sign in karne par bhi auto-admin ban jaayega.
+const ADMIN_EMAIL = "admin@mixsundarirecords.com";
+// NOTE: password yahan plain text mein rakhna sirf demo/prototype ke liye theek hai.
+// Live site par isko real backend (server-side) se verify karwayein, kisi ko bhi
+// browser ka source-code dekh kar password pata chal sakta hai.
+const ADMIN_PASSWORD = "CHANGE_ME_999";
+
+// Razorpay Dashboard → Settings → API Keys se milega (free signup).
+const RAZORPAY_KEY_ID = "YOUR_RAZORPAY_KEY_ID";
+const TRIAL_PRICE_PAISE = 99900; // ₹999.00
+
+let tracks = [];
+let trackCounter = 0;
+let referenceFile = null;
+
+const trackList = document.getElementById('track-list');
+const addTrackBtn = document.getElementById('add-track-btn');
+const analyzeBtn = document.getElementById('analyze-btn');
+const masterBtn = document.getElementById('master-btn');
+const statusLine = document.getElementById('status-line');
+const teacherContent = document.getElementById('teacher-content');
+const refInput = document.getElementById('ref-input');
+const refUploadLabel = document.getElementById('ref-upload-label');
+const refUploadText = document.getElementById('ref-upload-text');
+const backendStatus = document.getElementById('backend-status');
+
+const ROLES = ["generic","lead_vocal","backing_vocal","kick","snare","bass","guitar","keys","master"];
+
+function addTrackRow(){
+  trackCounter++;
+  const id = trackCounter;
+  tracks.push({ id, name: `Track ${id}`, file: null, role: "generic" });
+  renderTracks();
+}
+
+function removeTrack(id){
+  tracks = tracks.filter(t => t.id !== id);
+  renderTracks();
+}
+
+function renderTracks(){
+  trackList.innerHTML = "";
+  tracks.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'track';
+    row.innerHTML = `
+      <div class="track-num">${String(i+1).padStart(2,'0')}</div>
+      <div class="track-name-wrap">
+        <input type="text" value="${t.name}" data-id="${t.id}" class="track-name-input">
+        <div class="track-file">${t.file ? t.file.name : 'Koi file nahi chuni'}</div>
+      </div>
+      <select class="role" data-id="${t.id}">
+        ${ROLES.map(r => `<option value="${r}" ${r===t.role?'selected':''}>${r}</option>`).join('')}
+      </select>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label class="track-upload-btn">
+          UPLOAD
+          <input type="file" accept="audio/*" data-id="${t.id}" class="track-file-input">
+        </label>
+        <div class="track-remove" data-id="${t.id}">HATAYEIN</div>
+      </div>
+    `;
+    trackList.appendChild(row);
+  });
+
+  document.querySelectorAll('.track-file-input').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const id = parseInt(e.target.dataset.id);
+      const track = tracks.find(t => t.id === id);
+      if (e.target.files[0]) { track.file = e.target.files[0]; renderTracks(); updateActionState(); }
+    });
+  });
+  document.querySelectorAll('.track-name-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const id = parseInt(e.target.dataset.id);
+      tracks.find(t => t.id === id).name = e.target.value;
+    });
+  });
+  document.querySelectorAll('.role').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const id = parseInt(e.target.dataset.id);
+      tracks.find(t => t.id === id).role = e.target.value;
+    });
+  });
+  document.querySelectorAll('.track-remove').forEach(btn => {
+    btn.addEventListener('click', e => removeTrack(parseInt(e.target.dataset.id)));
+  });
+
+  updateActionState();
+}
+
+function updateActionState(){
+  const hasAudio = tracks.some(t => t.file);
+  const loggedIn = !!currentUser;
+  const trialLocked = loggedIn && !currentUser.isAdmin && currentUser.trialUsed;
+
+  analyzeBtn.disabled = !hasAudio || !loggedIn || trialLocked;
+
+  if (!loggedIn){
+    statusLine.textContent = "Sign in karein shuru karne ke liye.";
+  } else if (trialLocked){
+    statusLine.textContent = "Aapka free trial mix use ho chuka hai. Dobara mix ke liye jald hi plans available honge.";
+  } else if (hasAudio){
+    statusLine.textContent = `${tracks.filter(t=>t.file).length} track(s) taiyaar. Reference (optional) daal kar 'Analyze & Mix' dabayein.`;
+  } else {
+    statusLine.textContent = "Kam se kam 1 track upload karein shuru karne ke liye.";
+  }
+}
+
+refUploadLabel.addEventListener('click', () => refInput.click());
+refInput.addEventListener('change', e => {
+  if (e.target.files[0]){
+    referenceFile = e.target.files[0];
+    refUploadText.textContent = referenceFile.name;
+    refUploadText.parentElement.classList.add('ref-filename');
+  }
+});
+
+addTrackBtn.addEventListener('click', addTrackRow);
+
+// ============================================================
+// AUTH + PAYMENT FLOW
+// ============================================================
+let currentUser = null; // { name, email, mobile, isAdmin, hasPaid, trialUsed }
+
+const authOverlay = document.getElementById('auth-overlay');
+const mobileOverlay = document.getElementById('mobile-overlay');
+const paywallOverlay = document.getElementById('paywall-overlay');
+const studioEl = document.getElementById('studio');
+const loginView = document.getElementById('login-view');
+const adminView = document.getElementById('admin-view');
+const loginError = document.getElementById('login-error');
+const adminError = document.getElementById('admin-error');
+const mobileError = document.getElementById('mobile-error');
+const payError = document.getElementById('pay-error');
+const userChip = document.getElementById('user-chip');
+const userAvatar = document.getElementById('user-avatar');
+const userChipName = document.getElementById('user-chip-name');
+const userChipTag = document.getElementById('user-chip-tag');
+
+function decodeJwt(token){
+  try{
+    const payload = token.split('.')[1];
+    return JSON.parse(decodeURIComponent(atob(payload.replace(/-/g,'+').replace(/_/g,'/'))
+      .split('').map(c => '%' + ('00'+c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+  }catch(e){ return null; }
+}
+
+function initGoogleSignIn(){
+  if (!window.google || !google.accounts || GOOGLE_CLIENT_ID.startsWith('YOUR_')){
+    // Client ID abhi set nahi hai — fallback button ek helpful message dikhayega
+    document.getElementById('fallback-google-btn').addEventListener('click', () => {
+      loginError.textContent = "Google sign-in abhi configure nahi hui — GOOGLE_CLIENT_ID daalna baaki hai (script section dekhein).";
+    });
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('g_id_signin_wrap'),
+    { theme: "outline", size: "large", width: 356, text: "continue_with" }
+  );
+  document.getElementById('fallback-google-btn').style.display = 'none';
+}
+
+function handleGoogleCredential(response){
+  const profile = decodeJwt(response.credential);
+  if (!profile){ loginError.textContent = "Google se sign in nahi ho paya, dobara try karein."; return; }
+  currentUser = {
+    name: profile.name || profile.email,
+    email: profile.email,
+    picture: profile.picture || null,
+    mobile: null,
+    isAdmin: profile.email.toLowerCase() === ADMIN_EMAIL.toLowerCase(),
+    hasPaid: false,
+    trialUsed: false
+  };
+  if (currentUser.isAdmin){
+    finishLogin();
+  } else {
+    authOverlay.classList.add('hidden');
+    mobileOverlay.classList.remove('hidden');
+  }
+}
+
+document.getElementById('show-admin-login').addEventListener('click', () => {
+  loginView.style.display = 'none';
+  adminView.style.display = 'block';
+});
+document.getElementById('show-google-login').addEventListener('click', () => {
+  adminView.style.display = 'none';
+  loginView.style.display = 'block';
+});
+
+document.getElementById('admin-login-btn').addEventListener('click', () => {
+  const email = document.getElementById('admin-email').value.trim();
+  const pass = document.getElementById('admin-password').value;
+  if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && pass === ADMIN_PASSWORD){
+    currentUser = { name: "Admin", email, mobile: null, isAdmin: true, hasPaid: true, trialUsed: false };
+    finishLogin();
+  } else {
+    adminError.textContent = "Email ya password galat hai.";
+  }
+});
+
+document.getElementById('mobile-continue-btn').addEventListener('click', () => {
+  const val = document.getElementById('mobile-input').value.trim();
+  if (!/^[+]?[0-9\s-]{8,15}$/.test(val)){
+    mobileError.textContent = "Sahi mobile number daalein.";
+    return;
+  }
+  currentUser.mobile = val;
+  mobileOverlay.classList.add('hidden');
+  paywallOverlay.classList.remove('hidden');
+});
+
+document.getElementById('pay-btn').addEventListener('click', () => {
+  if (RAZORPAY_KEY_ID.startsWith('YOUR_') || typeof Razorpay === 'undefined'){
+    payError.textContent = "Payment gateway abhi configure nahi hai — RAZORPAY_KEY_ID daalna baaki hai (script section dekhein).";
+    return;
+  }
+  const rzp = new Razorpay({
+    key: RAZORPAY_KEY_ID,
+    amount: TRIAL_PRICE_PAISE,
+    currency: "INR",
+    name: "Sundari Records",
+    description: "One-time trial mix",
+    prefill: { name: currentUser.name, email: currentUser.email, contact: currentUser.mobile },
+    handler: function(res){
+      currentUser.hasPaid = true;
+      paywallOverlay.classList.add('hidden');
+      finishLogin();
+    },
+    theme: { color: "#d61f1f" }
+  });
+  rzp.open();
+});
+
+function finishLogin(){
+  authOverlay.classList.add('hidden');
+  mobileOverlay.classList.add('hidden');
+  paywallOverlay.classList.add('hidden');
+  studioEl.classList.remove('studio-locked');
+  userChip.classList.add('show');
+  userChipName.textContent = currentUser.name;
+  userAvatar.textContent = (currentUser.name || '?').charAt(0).toUpperCase();
+  if (currentUser.picture){
+    userAvatar.style.background = `url(${currentUser.picture}) center/cover`;
+    userAvatar.textContent = '';
+  }
+  userChipTag.textContent = currentUser.isAdmin ? "ADMIN" : "TRIAL";
+  updateActionState();
+}
+
+document.getElementById('logout-link').addEventListener('click', () => {
+  currentUser = null;
+  studioEl.classList.add('studio-locked');
+  userChip.classList.remove('show');
+  loginView.style.display = 'block';
+  adminView.style.display = 'none';
+  loginError.textContent = ''; adminError.textContent = '';
+  authOverlay.classList.remove('hidden');
+});
+
+window.addEventListener('load', initGoogleSignIn);
+
+async function checkBackend(){
+  try{
+    const res = await fetch(BACKEND_URL + "/health", { signal: AbortSignal.timeout(3000) });
+    if (res.ok){
+      backendStatus.textContent = "BACKEND: CONNECTED";
+      backendStatus.style.color = "#3fae5c";
+    } else throw new Error();
+  }catch(e){
+    backendStatus.textContent = "BACKEND: OFFLINE (abhi local-only hai)";
+    backendStatus.style.color = "#d61f1f";
+  }
+}
+checkBackend();
+
+let lastRenderedAudioBlob = null; // /api/v1/mix/render se mila final mixed WAV (jab tak next analyze na ho)
+
+analyzeBtn.addEventListener('click', async () => {
+  const activeTracks = tracks.filter(t => t.file);
+  if (activeTracks.length === 0) return;
+
+  analyzeBtn.disabled = true;
+  masterBtn.disabled = true;
+  lastRenderedAudioBlob = null;
+  statusLine.textContent = "AI mix kar raha hai... isme track size ke hisaab se 10-60 second lag sakte hain.";
+  teacherContent.innerHTML = `<div class="empty-state">Analyze + Mix ho raha hai...</div>`;
+
+  try {
+    const formData = new FormData();
+    activeTracks.forEach(t => formData.append("files", t.file, t.name));
+    formData.append("roles", activeTracks.map(t => t.role).join(","));
+    const instruction = document.getElementById('instruction').value;
+    if (instruction) formData.append("instruction", instruction);
+    // NOTE: reference track abhi decision engine mein pass-through nahi hoti
+    // (backend context_builder.py mein future improvement chahiye).
+
+    const res = await fetch(BACKEND_URL + "/api/v1/mix/render", {
+      method: "POST",
+      body: formData
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.detail || ("Backend ne error diya: " + res.status));
+    }
+    const data = await res.json();
+
+    renderTeacherPanel(data.decision, activeTracks);
+
+    // Base64 WAV ko ek downloadable Blob mein badalte hain
+    const byteChars = atob(data.audio_base64);
+    const byteNumbers = new Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    lastRenderedAudioBlob = new Blob([new Uint8Array(byteNumbers)], { type: "audio/wav" });
+
+    statusLine.textContent = "Mix ban gaya! 'Master & Download' dabakar final WAV le lein.";
+    masterBtn.disabled = false;
+    if (currentUser && !currentUser.isAdmin){ currentUser.trialUsed = true; }
+
+  } catch (err) {
+    teacherContent.innerHTML = `<div class="empty-state" style="color:#d61f1f">
+      Backend se connect nahi ho paya.<br><br>
+      Ye tab hoga jab tak AI backend cloud par deploy nahi hota — abhi ye
+      sirf local Mac (127.0.0.1) par hi kaam karta hai, is public website
+      se nahi.<br><br>
+      <span style="color:var(--grey)">(${err.message})</span>
+    </div>`;
+    statusLine.textContent = "Connect nahi ho paya — neeche dekhein.";
+  } finally {
+    updateActionState();
+  }
+});
+
+function renderTeacherPanel(decision, activeTracks){
+  if (!decision || !decision.track_decisions){
+    teacherContent.innerHTML = `<div class="empty-state">Backend se koi decision nahi mila.</div>`;
+    return;
+  }
+  const rows = decision.track_decisions.map(td => {
+    const t = td.teaching_explanation || {};
+    return `
+    <div class="teacher-entry">
+      <span class="t-track">${td.track_name}</span> —
+      <span class="t-conf">${td.confidence ? Math.round(td.confidence*100)+'% confidence' : ''}</span>
+      <p style="margin-top:8px;"><b>Samasya:</b> ${t.what_was_the_problem || '—'}</p>
+      <p><b>Kya badla:</b> ${t.what_was_changed || '—'}</p>
+      <p><b>Kyun:</b> ${t.why_this_change || '—'}</p>
+    </div>`;
+  }).join('');
+  const overall = decision.overall_mix_assessment
+    ? `<div class="teacher-entry"><span class="t-track">Overall</span><p style="margin-top:8px;">${decision.overall_mix_assessment}</p></div>`
+    : '';
+  teacherContent.innerHTML = overall + rows;
+}
+
+masterBtn.addEventListener('click', () => {
+  if (!lastRenderedAudioBlob){
+    statusLine.textContent = "Pehle 'Analyze & Mix' dabayein.";
+    return;
+  }
+  const url = URL.createObjectURL(lastRenderedAudioBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = "sundari_final_master.wav"; a.click();
+  URL.revokeObjectURL(url);
+  statusLine.textContent = "Download shuru ho gaya!";
+});
+
+// Shuru mein ek khaali track dikhayein
+addTrackRow();
+</script>
+</body>
+</html>
