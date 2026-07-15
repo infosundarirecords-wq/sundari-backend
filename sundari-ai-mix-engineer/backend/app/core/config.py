@@ -16,20 +16,14 @@ try:
     from pydantic_settings import BaseSettings
     from pydantic import Field, field_validator
 except ImportError:
-    # pydantic-settings is a separate package since pydantic v2; guard so
-    # this module still imports (with reduced functionality) if someone
-    # hasn't installed requirements yet — avoids a confusing crash on the
-    # very first import in a fresh checkout.
     from pydantic import BaseSettings, Field, field_validator  # type: ignore
 
 
 class Settings(BaseSettings):
     app_name: str = "Sundari AI Mix Engineer"
-    environment: str = os.getenv("SUNDARI_ENV", "development")  # development | production
+    environment: str = os.getenv("SUNDARI_ENV", "development")
     api_v1_prefix: str = "/api/v1"
 
-    # Development default; production MUST override via env var (see
-    # docs/DEPLOYMENT_GUIDE.md, to be written in a later phase).
     database_url: str = os.getenv(
         "DATABASE_URL", "sqlite:///./sundari_dev.db"
     )
@@ -37,21 +31,18 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "500"))
     allowed_audio_extensions: tuple = (".wav", ".mp3", ".aiff", ".aif", ".flac")
 
-    # Production mein website ka asli domain(s) yahan env var se aayenge —
-    # comma-separated, e.g. ALLOWED_ORIGINS=https://mixsundarirecords.com
-    allowed_origins: list = Field(
-        default_factory=lambda: [
-            o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
-        ]
-    )
+    allowed_origins: list = Field(default_factory=list)
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def _split_allowed_origins(cls, v):
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
 
     upload_dir: str = os.getenv("UPLOAD_DIR", "./data/uploads")
     temp_dir: str = os.getenv("TEMP_DIR", "./data/temp")
 
-    # --- Phase 4: Multi-Provider Decision Engine ---
-    # Fallback order: agar pehla provider fail ho, agla try hota hai.
-    # Env var se comma-separated list di ja sakti hai, e.g.:
-    #   DECISION_PROVIDER_ORDER=claude,openai,gemini,local_llm
     decision_provider_order: list = Field(
         default_factory=lambda: os.getenv(
             "DECISION_PROVIDER_ORDER", "claude,openai,gemini,local_llm",
@@ -61,9 +52,6 @@ class Settings(BaseSettings):
     @field_validator("decision_provider_order", mode="before")
     @classmethod
     def _split_provider_order(cls, v):
-        # .env se ye value ek plain comma-separated string ke roop mein
-        # aati hai (jaise "claude,openai,gemini,local_llm") — JSON nahi.
-        # Isliye JSON-parse hone se pehle hi ise yahan split kar dete hain.
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
