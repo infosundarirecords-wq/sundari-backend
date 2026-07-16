@@ -70,7 +70,15 @@ def load_audio(path: str) -> LoadedAudio:
     duration = n_samples / sr
 
     return LoadedAudio(
-        samples=samples_2d.astype(np.float64),
+        # NOTE: float32 (not float64) — halves memory usage. Multiple full
+        # songs loaded together as float64 was almost certainly exceeding
+        # Render's free-tier 512MB RAM limit, causing the process to be
+        # killed mid-request (which shows up to the browser as a CORS/502
+        # error, since the process dies before it can send any response).
+        # float32 has ~7 decimal digits precision — plenty for audio
+        # (24-bit audio only needs ~144dB dynamic range, float32 covers
+        # this easily).
+        samples=samples_2d.astype(np.float32),
         sample_rate=int(sr),
         channels=n_channels,
         duration_seconds=round(float(duration), 3),
