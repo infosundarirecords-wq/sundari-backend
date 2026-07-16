@@ -1,12 +1,13 @@
 """
 loader.py
 =========
+
 Multi-format audio loading (WAV, MP3, AIFF, FLAC).
 
 Strategy:
-- Primary path: `soundfile` (libsndfile) handles WAV/AIFF/FLAC natively,
-  losslessly, and fast. `librosa.load` is used as the loading front-end
-  because it transparently falls back to `audioread`/ffmpeg for MP3 (which
+- Primary path: soundfile (libsndfile) handles WAV/AIFF/FLAC natively,
+  losslessly, and fast. librosa.load is used as the loading front-end
+  because it transparently falls back to audioread/ffmpeg for MP3 (which
   libsndfile does not support directly), so a single call handles all four
   required formats.
 - Output is always normalized to float64 numpy array, shape
@@ -15,14 +16,14 @@ Strategy:
   source sample rate) — resampling is only done inside specific metrics
   (e.g. true-peak oversampling) where it is spec-required.
 
-Requires `ffmpeg` to be installed on the host system for MP3 support
+Requires ffmpeg to be installed on the host system for MP3 support
 (librosa/audioread shell out to it). This is documented in the
 Installation Guide (Phase 1 docs) as a system dependency.
 """
-
 from __future__ import annotations
 
 import os
+
 import numpy as np
 from dataclasses import dataclass
 
