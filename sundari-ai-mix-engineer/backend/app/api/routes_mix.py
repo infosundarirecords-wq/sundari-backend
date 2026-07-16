@@ -22,6 +22,7 @@ timeout settings zyada rakhein (reverse proxy / uvicorn dono mein).
 from __future__ import annotations
 
 import base64
+import gc
 import io
 import os
 import shutil
@@ -155,10 +156,19 @@ async def render_mix(
         render_tracks = [(loaded.samples, name) for loaded, name in loaded_list]
         final_mix = render_project(render_tracks, decision_dict, common_sr)
 
+        # Peak-memory ko kam karne ke liye: render ho jaane ke baad raw
+        # track arrays (jo ab nahi chahiye) turant free kar dete hain,
+        # aur Python ko turant garbage-collect karne ke liye kehte hain —
+        # Render free-tier ki 512MB RAM limit mein fit hona zaroori hai.
+        del render_tracks, loaded_list
+        gc.collect()
+
         buf = io.BytesIO()
         sf.write(buf, final_mix.T, common_sr, format="WAV", subtype="PCM_24")
         buf.seek(0)
         audio_b64 = base64.b64encode(buf.read()).decode("ascii")
+        del final_mix, buf
+        gc.collect()
 
         return {
             "decision": decision_dict,
