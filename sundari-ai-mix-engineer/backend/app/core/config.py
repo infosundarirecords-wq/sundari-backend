@@ -1,11 +1,15 @@
 """
 config.py
 =========
-Centralized application settings, loaded from environment variables (with
-sensible local-dev defaults) using pydantic-settings.
-"""
 
+Centralized application settings, loaded from environment variables (with
+sensible local-dev defaults) using pydantic-settings. Keeping this in one
+place now (Phase 1) means later phases (auth, cloud sync, subscriptions)
+just add fields here rather than scattering os.environ calls through
+the codebase.
+"""
 from __future__ import annotations
+
 import os
 from functools import lru_cache
 
@@ -13,14 +17,20 @@ try:
     from pydantic_settings import BaseSettings
     from pydantic import Field, field_validator
 except ImportError:
+    # pydantic-settings is a separate package since pydantic v2; guard so
+    # this module still imports (with reduced functionality) if someone
+    # hasn't installed requirements yet — avoids a confusing crash on the
+    # very first import in a fresh checkout.
     from pydantic import BaseSettings, Field, field_validator  # type: ignore
 
 
 class Settings(BaseSettings):
     app_name: str = "Sundari AI Mix Engineer"
-    environment: str = os.getenv("SUNDARI_ENV", "development")
+    environment: str = os.getenv("SUNDARI_ENV", "development")  # development | production
     api_v1_prefix: str = "/api/v1"
 
+    # Development default; production MUST override via env var (see
+    # docs/DEPLOYMENT_GUIDE.md, to be written in a later phase).
     database_url: str = os.getenv(
         "DATABASE_URL", "sqlite:///./sundari_dev.db"
     )
@@ -28,6 +38,16 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "500"))
     allowed_audio_extensions: tuple = (".wav", ".mp3", ".aiff", ".aif", ".flac")
 
+    # Production mein website ka asli domain(s) yahan env var se aayenge —
+    # comma-separated, e.g. ALLOWED_ORIGINS=https://mixsundarirecords.com
+    #
+    # NOTE: field ko seedha list type nahi rakha — pydantic-settings
+    # env vars ko list/dict type fields ke liye validator chalne SE PEHLE
+    # hi JSON ki tarah decode karne ki koshish karta hai, aur plain
+    # comma-separated string (JSON nahi) dene par crash ho jaata hai
+    # ("error parsing value... EnvSettingsSource"). Isliye raw string
+    # field rakha hai, aur neeche ek plain Python @property se list banate
+    # hain — ye pydantic ke JSON-parsing step se bilkul bachta hai.
     allowed_origins_raw: str = os.getenv("ALLOWED_ORIGINS", "")
 
     @property
@@ -37,6 +57,12 @@ class Settings(BaseSettings):
     upload_dir: str = os.getenv("UPLOAD_DIR", "./data/uploads")
     temp_dir: str = os.getenv("TEMP_DIR", "./data/temp")
 
+    # --- Phase 4: Multi-Provider Decision Engine ---
+    # Fallback order: agar pehla provider fail ho, agla try hota hai.
+    # Env var se comma-separated list di ja sakti hai, e.g.:
+    #   DECISION_PROVIDER_ORDER=claude,openai,gemini,local_llm
+    # (Same reason as allowed_origins above: raw string + @property,
+    # taaki pydantic-settings ka JSON-decode-first behaviour crash na kare.)
     decision_provider_order_raw: str = os.getenv(
         "DECISION_PROVIDER_ORDER", "claude,openai,gemini,local_llm"
     )
