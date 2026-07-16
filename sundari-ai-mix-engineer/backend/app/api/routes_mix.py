@@ -1,6 +1,7 @@
 """
 routes_mix.py
 =============
+
 Phase 8 (Website) ke liye naya endpoint: Decision Engine se AI decisions
 lekar unhe turant actual audio par render bhi karta hai, taaki website
 "Analyze & Mix" ke baad ek sach mein mixed+mastered WAV file bhi de sake
@@ -18,7 +19,6 @@ Note: yeh endpoint CPU-heavy hai (audio DSP, ho sakta hai 10-60 second
 lage project size ke hisaab se) — cloud server par kaam ki wajah se
 timeout settings zyada rakhein (reverse proxy / uvicorn dono mein).
 """
-
 from __future__ import annotations
 
 import base64
@@ -44,10 +44,11 @@ from app.core.config_to_providers import build_provider_configs
 from app.rendering.renderer import render_project
 
 router = APIRouter(prefix="/mix", tags=["Mix Render (Website)"])
+
 analysis_engine = AnalysisEngine()
 
 
-def _save_upload_to_temp(upload: UploadFile) -> str:
+def save_upload_to_temp(upload: UploadFile) -> str:
     ext = os.path.splitext(upload.filename or "")[1].lower()
     fd, tmp_path = tempfile.mkstemp(suffix=ext)
     with os.fdopen(fd, "wb") as f:
@@ -84,11 +85,13 @@ async def render_mix(
     try:
         track_analyses = []
         loaded_list = []
+
         for file, role in zip(files, role_list):
-            tmp_path = _save_upload_to_temp(file)
+            tmp_path = save_upload_to_temp(file)
             tmp_paths.append(tmp_path)
             loaded = load_audio(tmp_path)
             loaded_list.append((loaded, file.filename or "Untitled"))
+
             result = analysis_engine.analyze_track(
                 loaded.samples, loaded.sample_rate, track_name=file.filename or "Untitled",
             )
@@ -167,6 +170,7 @@ async def render_mix(
         sf.write(buf, final_mix.T, common_sr, format="WAV", subtype="PCM_24")
         buf.seek(0)
         audio_b64 = base64.b64encode(buf.read()).decode("ascii")
+
         del final_mix, buf
         gc.collect()
 
