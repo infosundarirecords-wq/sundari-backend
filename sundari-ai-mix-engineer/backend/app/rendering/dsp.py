@@ -273,3 +273,97 @@ def match_lufs(audio: np.ndarray, sr: int, target_lufs: float, measure_lufs_fn) 
     gain_db = target_lufs - current
     gain_db = max(min(gain_db, 24.0), -24.0)  # sanity clamp
     return audio * (10 ** (gain_db / 20.0))
+
+
+# ---------------------------------------------------------------------------
+# Time-based effects -- short reverb & slapback delay (lead vocal ambience)
+# ---------------------------------------------------------------------------
+# Yeh naya block block-recurrence trick istemal karta hai (jaise upar
+# envelope_follower aur apply_limiter mein already hota hai) taaki lambi
+# feedback-delay wale comb/allpass filters bhi Render jaise free-tier CPU
+# par slow/timeout na ho -- ek per-sample Python loop ki jagah, exactly
+# delay-length ke blocks mein vectorized numpy recursion chalti hai.
+
+def _comb_filter_block(x: np.ndarray, delay_samples: int, feedback: float) -> np.ndarray:
+    """Feedback comb filter: y[n] = x[n] + feedback * y[n - delay_samples]."""
+    n = x.shape[0]
+    y = np.empty(n)
+    prev_block = np.zeros(delay_samples)
+    pos = 0
+    while pos < n:
+        end = min(pos + delay_samples, n)
+        cur_len = end - pos
+        y[pos:end] = x[pos:end] + feedback * prev_block[:cur_len]
+        prev_block = y[pos:end] if cur_len == delay_samples else np.pad(y[pos:end], (0, delay_samples - cur_len))
+        pos = end
+    return y
+
+def _allpass_filter_block(x: np.ndarray, delay_samples: int, feedback: float) -> np.ndarray:
+    """Schroeder allpass filter: y[n] = -feedback*x[n] + x[n-D] + feedback*y[n-D]."""
+    n = x.shape[0]
+    y = np.empty(n)
+    prev_x_block = np.zeros(delay_samples)
+    prev_y_block = np.zeros(delay_samples)
+    pos = 0
+    while pos < n:
+        end = min(pos + delay_samples, n)
+        cur_len = end - pos
+        cur_x = x[pos:end]
+        y[pos:end] = -feedback * cur_x + prev_x_block[:cur_len] + feedback * prev_y_block[:cur_len]
+        prev_x_block = cur_x if cur_len == delay_samples else np.pad(cur_x, (0, delay_samples - cur_len))
+        prev_y_block = y[pos:end] if cur_len == delay_samples else np.pad(y[pos:end], (0, delay_samples - cur_len))
+        pos = end
+    return y
+
+def apply_short_reverb(audio: np.ndarray, sr: int, wet_mix: float = 0.14, room_size_ms: float = 45.0) -> np.ndarray:
+    """
+    Halka short plate/room reverb -- Schroeder-style network (4 parallel
+    feedback comb filters + 2 series allpass filters for diffusion), chhoti
+    decay time (~0.3-0.5s). Maqsad sirf itna space/depth dena hai ki vocal
+    "khaali" na lage, bina use peeche dhakelne ke -- isliye wet_mix jaan-
+    boojh kar low rakha gaya hai (vocal hamesha dry-dominant, upfront
+    rehta hai).
+    """
+    comb_delays_ms = [29.7, 37.1, 41.1, 43.7]
+    comb_gains = [0.74, 0.73, 0.715, 0.697]
+    allpass_delays_ms = [5.0, 1.7]
+    allpass_gain = 0.6
+    scale = max(room_size_ms, 5.0) / 43.7
+
+    out = np.empty_like(audio)
+    for ch in range(audio.shape[0]):
+        x = audio[ch]
+        tail = np.zeros_like(x)
+        for d_ms, g in zip(comb_delays_ms, comb_gains):
+            d_samples = max(1, int(sr * d_ms * scale / 1000.0))
+            tail = tail + _comb_filter_block(x, d_samples, g)
+        tail = tail / len(comb_delays_ms)
+        for d_ms in allpass_delays_ms:
+            d_samples = max(1, int(sr * d_ms / 1000.0))
+            tail = _allpass_filter_block(tail, d_samples, allpass_gain)
+        out[ch] = x + wet_mix * tail
+    return out
+
+def apply_slapback_delay(audio: np.ndarray, sr: int, delay_ms: float = 110.0,
+                          feedback: float = 0.16, wet_mix: float = 0.15) -> np.ndarray:
+    """
+    Halka slapback delay: ek chhota single/double echo, low feedback aur low
+    wet_mix ke saath, taaki vocal mein thoda "bounce"/space feel ho lekin
+    saaf-suthri, upfront vocal clarity kharab na ho.
+    """
+    delay_samples = max(1, int(sr * delay_ms / 1000.0))
+    out = np.empty_like(audio)
+    for ch in range(audio.shape[0]):
+        x = audio[ch]
+        y = _comb_filter_block(x, delay_samples, feedback)
+        wet_only = y - x  # sirf delayed echoes; dry hamesha 100% level par rehta hai
+        out[ch] = x + wet_mix * wet_only
+    return out
+
+def apply_presence_boost(audio: np.ndarray, sr: int, gain_db: float = 2.5) -> np.ndarray:
+    """
+    Upper-mid 'presence' boost (~3-8kHz) -- vocal mein chamak/clarity ke
+    liye, jaisa professional Bollywood playback vocals mein hota hai. Ek
+    wide bell band jo roughly 3-8kHz range ko halka boost karta hai.
+    """
+    return apply_eq_band(audio, sr, freq_hz=5200.0, gain_db=gain_db, q=0.75, filter_type="bell")
