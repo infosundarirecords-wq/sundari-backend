@@ -10,10 +10,20 @@ Yeh JUCE plugin ke real-time signal chain ka offline/batch Python
 equivalent hai — website ke "upload -> final mixed download" flow ke
 liye zaroori tha, kyunki plugin sirf Logic Pro ke andar chalta hai.
 
-Jaan-boojh kar scope se bahar rakha gaya (v1): reverb/delay sends,
-sidechain ducking, multiband compression, time-based automation.
-Inke decision fields already schema mein maujood hain, future version
-mein yahan implement kiye ja sakte hain.
+Lead vocal ambience (v1.1): "lead_vocal" role wale track par, chain ke
+end mein (saturation ke baad, clip-gain se pehle) automatically ek
+halka presence boost (~3-8kHz) + short plate/room reverb + slapback
+delay lagaya jaata hai — fixed, tasteful default settings ke saath,
+Decision Engine ke output par depend kiye bina, taaki har project mein
+consistently professional/Bollywood-style vocal chamak aur depth mile,
+bina vocal ko peeche dhakele.
+
+Jaan-boojh kar scope se bahar rakha gaya (v1): sidechain ducking,
+multiband compression, time-based automation, aur per-track AI-decided
+reverb/delay amounts (decision_schema.py ke SpaceEffectsDecision field
+abhi render mein pass-through nahi hote — sirf lead vocal ka fixed
+default chalta hai). Inke decision fields already schema mein maujood
+hain, future version mein yahan implement kiye ja sakte hain.
 """
 
 from __future__ import annotations
@@ -23,10 +33,10 @@ import numpy as np
 from app.rendering import dsp
 from app.analysis.metrics import measure_lufs
 
-
-def render_track(samples: np.ndarray, sr: int, decision: dict) -> np.ndarray:
+def render_track(samples: np.ndarray, sr: int, decision: dict, role: str | None = None) -> np.ndarray:
     """Ek track ke liye poori DSP chain: EQ -> De-esser -> Compression ->
-    Saturation -> Clip Gain -> Stereo/Pan. Returns (2, n_samples) stereo."""
+    Saturation -> [Lead Vocal: Presence + Reverb + Delay] -> Clip Gain ->
+    Stereo/Pan. Returns (2, n_samples) stereo."""
     audio = samples.astype(np.float64)
 
     eq_bands = decision.get("eq_bands") or []
@@ -53,6 +63,15 @@ def render_track(samples: np.ndarray, sr: int, decision: dict) -> np.ndarray:
     if saturation and saturation.get("needed"):
         audio = dsp.apply_saturation(audio, saturation.get("amount_percent") or 10.0)
 
+    # --- Lead vocal ambience: hamesha automatic, har project ke liye ---
+    # Fixed, subtle defaults (low wet_mix) taaki vocal hamesha saaf aur
+    # sabse aage sunayi de — sirf itna space/chamak ke vocal "khaali" na
+    # lage, professional Bollywood playback jaisa touch.
+    if role == "lead_vocal":
+        audio = dsp.apply_presence_boost(audio, sr, gain_db=2.5)
+        audio = dsp.apply_short_reverb(audio, sr, wet_mix=0.14, room_size_ms=45.0)
+        audio = dsp.apply_slapback_delay(audio, sr, delay_ms=110.0, feedback=0.16, wet_mix=0.15)
+
     clip_gain = decision.get("clip_gain_adjustment_db") or 0.0
     audio = dsp.apply_clip_gain(audio, clip_gain)
 
@@ -68,21 +87,21 @@ def render_track(samples: np.ndarray, sr: int, decision: dict) -> np.ndarray:
 
     return stereo
 
-
 def _pad_to_length(audio: np.ndarray, length: int) -> np.ndarray:
     if audio.shape[1] >= length:
         return audio[:, :length]
     pad = np.zeros((audio.shape[0], length - audio.shape[1]))
     return np.hstack([audio, pad])
 
-
 def render_project(tracks: list[tuple], project_decision: dict, sr: int) -> np.ndarray:
     """
-    tracks: list of (samples: np.ndarray, track_name: str) in the same
-            order as project_decision['track_decisions'].
+    tracks: list of (samples: np.ndarray, track_name: str, role: str | None)
+    in the same order as project_decision['track_decisions']. role ka
+    istemal sirf lead-vocal ambience (presence/reverb/delay) auto-apply
+    karne ke liye hota hai — DSP decision khud role-agnostic rehta hai.
     project_decision: ProjectMixDecision.model_dump() output.
     sr: common sample rate (caller ensures all tracks match, ya yahan
-        resample kar chuka hota hai).
+    resample kar chuka hota hai).
 
     Returns: (2, n_samples) final mastered stereo mix, float64, roughly
     [-1, 1] range (already peak-safe via limiter).
@@ -91,9 +110,10 @@ def render_project(tracks: list[tuple], project_decision: dict, sr: int) -> np.n
 
     rendered = []
     max_len = 0
-    for samples, name in tracks:
+    for track in tracks:
+        samples, name, role = track if len(track) == 3 else (*track, None)
         decision = track_decisions.get(name, {})
-        stereo = render_track(samples, sr, decision)
+        stereo = render_track(samples, sr, decision, role=role)
         rendered.append(stereo)
         max_len = max(max_len, stereo.shape[1])
 
