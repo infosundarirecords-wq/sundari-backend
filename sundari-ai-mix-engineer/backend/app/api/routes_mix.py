@@ -47,14 +47,12 @@ router = APIRouter(prefix="/mix", tags=["Mix Render (Website)"])
 
 analysis_engine = AnalysisEngine()
 
-
 def save_upload_to_temp(upload: UploadFile) -> str:
     ext = os.path.splitext(upload.filename or "")[1].lower()
     fd, tmp_path = tempfile.mkstemp(suffix=ext)
     with os.fdopen(fd, "wb") as f:
         shutil.copyfileobj(upload.file, f)
     return tmp_path
-
 
 @router.post("/render")
 async def render_mix(
@@ -156,7 +154,13 @@ async def render_mix(
                     ),
                 )
 
-        render_tracks = [(loaded.samples, name) for loaded, name in loaded_list]
+        # role bhi pass karte hain (loaded_list aur track_analyses same order
+        # mein bane the upar wale loop mein) taaki renderer.py lead_vocal ke
+        # liye automatic presence/reverb/delay ambience laga sake.
+        render_tracks = [
+            (loaded.samples, name, role)
+            for (loaded, name), (_, _, role) in zip(loaded_list, track_analyses)
+        ]
         final_mix = render_project(render_tracks, decision_dict, common_sr)
 
         # Peak-memory ko kam karne ke liye: render ho jaane ke baad raw
