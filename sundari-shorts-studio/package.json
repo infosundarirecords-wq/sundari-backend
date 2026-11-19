@@ -6,15 +6,18 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "build": "node --check src/server.js",
     "test": "node --test",
     "postinstall": "node scripts/verify-binaries.js"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=22.22.2"
+  },
   "dependencies": {
+    "@distube/ytdl-core": "^5.2.1",
     "express": "^5.1.0",
     "ffmpeg-static": "^5.2.0",
     "helmet": "^8.1.0",
-    "nanoid": "^5.1.6",
-    "youtube-dl-exec": "^3.1.19"
+    "nanoid": "^5.1.6"
   }
 }

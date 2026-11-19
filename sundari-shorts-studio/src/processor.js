@@ -1,12 +1,19 @@
 import fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { pipeline } from 'node:stream/promises';
 import ffmpegPath from 'ffmpeg-static';
-import youtubedl from 'youtube-dl-exec';
-import { findFirst, parseVtt, selectHighlights, srtForWindow } from './lib.js';
+import { Ytdl } from '@distube/ytdl-core';
+import { parseVtt, selectHighlights, srtForWindow } from './lib.js';
 
 const dataRoot = path.resolve('data');
-const ffprobePath = ffmpegPath.replace(/ffmpeg(?:\.exe)?$/, process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe');
+const yt = new Ytdl({
+  country: 'IN',
+  lang: 'hi',
+  timeoutMs: 45000,
+  cookie: process.env.YOUTUBE_COOKIE || undefined
+});
 
 async function command(bin, args, onLog = () => {}) {
   return new Promise((resolve, reject) => {
@@ -24,31 +31,42 @@ export async function processJob(job, update) {
   await fs.mkdir(dir, { recursive: true });
   const log = text => update({ log: String(text).slice(-1200) });
   update({ stage: 'वीडियो की जानकारी पढ़ी जा रही है', progress: 8 });
-  const info = await youtubedl(job.url, { dumpSingleJson: true, noPlaylist: true, noWarnings: true });
-  const duration = Number(info.duration || 0);
+  const info = await yt.getInfo(job.url);
+  const details = info.videoDetails;
+  const duration = Number(details.lengthSeconds || 0);
   const maxSeconds = Number(process.env.MAX_VIDEO_MINUTES || 90) * 60;
   if (!duration || duration > maxSeconds) throw new Error(`वीडियो ${process.env.MAX_VIDEO_MINUTES || 90} मिनट से कम होना चाहिए।`);
 
-  update({ title: info.title, thumbnail: info.thumbnail, duration, stage: 'वीडियो डाउनलोड हो रहा है', progress: 15 });
-  await youtubedl(job.url, {
-    noPlaylist: true,
-    format: 'bv*[height<=720]+ba/b[height<=720]',
-    mergeOutputFormat: 'mp4',
-    output: path.join(dir, 'source.%(ext)s'),
-    noWarnings: true
-  });
-  const source = await findFirst(dir, /^source\.(mp4|mkv|webm|mov)$/i);
-  if (!source) throw new Error('वीडियो डाउनलोड नहीं हो पाया।');
+  update({ title: details.title, thumbnail: details.thumbnails?.at(-1)?.url, duration, stage: 'वीडियो डाउनलोड हो रहा है', progress: 15 });
+  const videoFormats = info.formats.filter(f => f.hasVideo && Number(f.height || 0) <= 720)
+    .sort((a, b) => Number(b.height || 0) - Number(a.height || 0) || Number(b.bitrate || 0) - Number(a.bitrate || 0));
+  const videoFormat = videoFormats.find(f => !f.hasAudio) || videoFormats[0];
+  if (!videoFormat) throw new Error('वीडियो stream उपलब्ध नहीं है।');
+  const videoFile = path.join(dir, `video.${videoFormat.container || 'mp4'}`);
+  const downloads = [pipeline(yt.download(info, { format: videoFormat }), createWriteStream(videoFile))];
+  let audioFile = null;
+  if (!videoFormat.hasAudio) {
+    const audioFormat = info.formats.filter(f => f.hasAudio && !f.hasVideo)
+      .sort((a, b) => Number(b.audioBitrate || 0) - Number(a.audioBitrate || 0))[0];
+    if (!audioFormat) throw new Error('ऑडियो stream उपलब्ध नहीं है।');
+    audioFile = path.join(dir, `audio.${audioFormat.container || 'webm'}`);
+    downloads.push(pipeline(yt.download(info, { format: audioFormat }), createWriteStream(audioFile)));
+  }
+  await Promise.all(downloads);
+  const source = path.join(dir, 'source.mp4');
+  const mergeArgs = audioFile
+    ? ['-y', '-i', videoFile, '-i', audioFile, '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-movflags', '+faststart', source]
+    : ['-y', '-i', videoFile, '-map', '0:v:0', '-map', '0:a?', '-c:v', 'copy', '-c:a', 'aac', '-movflags', '+faststart', source];
+  await command(ffmpegPath, mergeArgs, log);
+  await Promise.all([fs.rm(videoFile, { force: true }), audioFile ? fs.rm(audioFile, { force: true }) : null]);
 
   update({ stage: 'कैप्शन तैयार हो रहे हैं', progress: 32 });
+  let cues = [];
   try {
-    await youtubedl(job.url, {
-      noPlaylist: true, skipDownload: true, writeAutoSubs: true, writeSubs: true,
-      subLangs: 'hi.*,en.*', subFormat: 'vtt', output: path.join(dir, 'caption.%(ext)s'), noWarnings: true
-    });
+    const tracks = info.captionTracks || [];
+    const track = tracks.find(t => /^hi\b/i.test(t.languageCode)) || tracks.find(t => /^en\b/i.test(t.languageCode)) || tracks[0];
+    if (track) cues = parseVtt(await yt.getCaptions(info, { lang: track.languageCode }));
   } catch (error) { log(error.message); }
-  const vttPath = await findFirst(dir, /^caption\..*\.vtt$/i);
-  const cues = vttPath ? parseVtt(await fs.readFile(vttPath, 'utf8')) : [];
   const picks = selectHighlights(cues, duration, job.count, job.clipLength);
   const outputs = [];
 
@@ -62,15 +80,16 @@ export async function processJob(job, update) {
     update({ stage: `शॉर्ट ${i + 1}/${picks.length} एडिट हो रहा है`, progress: 38 + Math.round(i / picks.length * 55) });
     const srtEscaped = srt.replace(/'/g, "'\\''").replace(/:/g, '\\:');
     const hookEscaped = hookFile.replace(/'/g, "'\\''").replace(/:/g, '\\:');
-    const filter = [
+    const filters = [
       '[0:v]split=2[base][front]',
       '[base]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28[bg]',
       '[front]scale=1000:1540:force_original_aspect_ratio=decrease[fg]',
       '[bg][fg]overlay=(W-w)/2:(H-h)/2,drawbox=x=0:y=0:w=iw:h=250:color=black@0.58:t=fill',
-      `subtitles='${hookEscaped}'`,
-      `subtitles='${srtEscaped}':force_style='FontName=Sans,FontSize=17,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=3,Shadow=1,BackColour=&H9A000000,Alignment=2,MarginV=120'`,
-      'fade=t=in:st=0:duration=0.25,fade=t=out:st=' + Math.max(0, job.clipLength - .35) + ':duration=0.35[v]'
-    ].join(',');
+      `subtitles='${hookEscaped}'`
+    ];
+    if (cues.length) filters.push(`subtitles='${srtEscaped}':force_style='FontName=Sans,FontSize=17,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=3,Shadow=1,BackColour=&H9A000000,Alignment=2,MarginV=120'`);
+    filters.push('fade=t=in:st=0:duration=0.25,fade=t=out:st=' + Math.max(0, job.clipLength - .35) + ':duration=0.35[v]');
+    const filter = filters.join(',');
     await command(ffmpegPath, ['-y', '-ss', String(pick.start), '-i', source, '-t', String(job.clipLength),
       '-filter_complex', filter, '-map', '[v]', '-map', '0:a?', '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11,afade=t=in:duration=0.2,afade=t=out:st=' + Math.max(0, job.clipLength - .3) + ':duration=0.3',
       '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', output], log);

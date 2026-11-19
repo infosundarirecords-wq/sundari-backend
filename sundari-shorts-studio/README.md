@@ -30,5 +30,6 @@ Poll `GET /api/jobs/:id` until `status` is `completed` or `failed`.
 ## Notes
 
 - Use only videos you own or have permission to download and edit.
-- YouTube may block some server IPs or require cookies. The app intentionally does not bypass login or access controls.
+- YouTube may block datacenter IPs or require login. For an authorized account, set `YOUTUBE_COOKIE` to a Netscape-format cookie export in the hosting environment. Treat it like a password and never commit it.
+- The app intentionally does not bypass login, private-video access, age gates, or other access controls.
 - Hostinger needs enough CPU/RAM and permission to execute the bundled FFmpeg/yt-dlp binaries.
