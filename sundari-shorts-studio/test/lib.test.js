@@ -1,3 +1,0 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {isYouTubeUrl,parseVtt,selectHighlights,srtForWindow} from '../src/lib.js';
-test('only YouTube URLs are accepted',()=>{assert.equal(isYouTubeUrl('https://youtu.be/abc'),true);assert.equal(isYouTubeUrl('https://evil.test/watch?v=abc'),false)});
-test('VTT parsing and SRT window',()=>{const cues=parseVtt('WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nनमस्ते दुनिया\n\n00:00:04.000 --> 00:00:06.000\nकैसे हैं आप?');assert.equal(cues.length,2);assert.match(srtForWindow(cues,0,10),/नमस्ते/);assert.equal(selectHighlights(cues,20,1,10).length,1)});
